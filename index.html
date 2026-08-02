@@ -325,7 +325,7 @@ footer{text-align:center;padding:1.8rem 1rem 2.4rem;color:var(--dim);font-size:.
         <option value="neural">Neural network</option>
         <option value="starfield">Starfield</option>
         <option value="bubbles">Floating orbs</option>
-        <option value="grid">Pulsing grid</option>
+        <option value="aurora">Aurora</option>
         <option value="waves">Waves</option>
       </select>
     </div>
@@ -404,8 +404,8 @@ document.addEventListener('click',e=>{
 /* animated background engine — multiple styles */
 const Bg=(function(){
   const cv=document.getElementById('bg-canvas'),ctx=cv.getContext('2d');
-  let W,H,rafId=null,run=false,style='neural';
-  let nodes=[],orbs=[],stars=[],shooting=null,t=0;
+  let W,H,rafId=null,run=false,style='starfield';
+  let nodes=[],orbs=[],stars=[],t=0;
   const rgb=()=>getComputedStyle(document.documentElement).getPropertyValue('--particle').trim()||'110,168,254';
   function size(){W=cv.width=innerWidth;H=cv.height=innerHeight;seed();}
   function seed(){
@@ -413,7 +413,6 @@ const Bg=(function(){
     orbs=Array.from({length:16},()=>({x:Math.random()*W,y:Math.random()*H,r:30+Math.random()*90,vx:(Math.random()-.5)*.25,vy:(Math.random()-.5)*.25,a:.04+Math.random()*.06}));
     const density=Math.round((W*H)/9000);
     stars=Array.from({length:Math.min(220,Math.max(90,density))},()=>({x:Math.random()*W,y:Math.random()*H,r:.5+Math.random()*1.4,tw:Math.random()*6.28,ts:.5+Math.random()*1.5,drift:.04+Math.random()*.12}));
-    shooting=null;
   }
   function drawNeural(){
     const col=rgb(),MAX=150;
@@ -427,16 +426,28 @@ const Bg=(function(){
   function drawStarfield(){
     const col=rgb();
     stars.forEach(s=>{s.tw+=.06*s.ts;s.y+=s.drift*2;if(s.y>H+2){s.y=-2;s.x=Math.random()*W;}const a=.25+.55*(.5+.5*Math.sin(s.tw));ctx.beginPath();ctx.arc(s.x,s.y,s.r,0,6.28);ctx.fillStyle=`rgba(${col},${a.toFixed(3)})`;ctx.fill();});
-    if(!shooting&&Math.random()<.004)shooting={x:Math.random()*W*.6,y:Math.random()*H*.4,vx:6+Math.random()*4,vy:3+Math.random()*2,life:1};
-    if(shooting){shooting.x+=shooting.vx;shooting.y+=shooting.vy;shooting.life-=.012;const tx=shooting.x-shooting.vx*6,ty=shooting.y-shooting.vy*6;const g=ctx.createLinearGradient(shooting.x,shooting.y,tx,ty);g.addColorStop(0,`rgba(${col},${Math.max(0,shooting.life*.9).toFixed(3)})`);g.addColorStop(1,`rgba(${col},0)`);ctx.strokeStyle=g;ctx.lineWidth=1.6;ctx.beginPath();ctx.moveTo(shooting.x,shooting.y);ctx.lineTo(tx,ty);ctx.stroke();if(shooting.life<=0||shooting.x>W+40||shooting.y>H+40)shooting=null;}
   }
   function drawBubbles(){
     const col=rgb();
     orbs.forEach(o=>{o.x+=o.vx*2;o.y+=o.vy*2;if(o.x<-o.r)o.x=W+o.r;if(o.x>W+o.r)o.x=-o.r;if(o.y<-o.r)o.y=H+o.r;if(o.y>H+o.r)o.y=-o.r;const g=ctx.createRadialGradient(o.x,o.y,0,o.x,o.y,o.r);g.addColorStop(0,`rgba(${col},${o.a})`);g.addColorStop(1,`rgba(${col},0)`);ctx.fillStyle=g;ctx.beginPath();ctx.arc(o.x,o.y,o.r,0,6.28);ctx.fill();});
   }
-  function drawGrid(){
-    const col=rgb(),gap=46;
-    for(let x=0;x<=W;x+=gap)for(let y=0;y<=H;y+=gap){const a=.05+.05*Math.sin(t*.6+(x+y)*.01);ctx.fillStyle=`rgba(${col},${Math.max(0,a).toFixed(3)})`;ctx.beginPath();ctx.arc(x,y,1.4,0,6.28);ctx.fill();}
+  /* Aurora - slow luminous curtains. No particles and no hard edges, so there
+     is nothing for the eye to lock onto; it reads as depth rather than motion.
+     Replaces the pulsing dot grid, whose synchronised blink was the most
+     attention-grabbing of the set. Matches the quizzes + directories. */
+  function drawAurora(){
+    const col=rgb();
+    for(let k=0;k<3;k++){
+      const yB=H*(.2+k*.26),amp=34+k*15,sp=t*(.13+k*.04),th=120+k*45,pts=[];
+      for(let x=0;x<=W+20;x+=20)pts.push([x,yB+Math.sin(x*.004+sp)*amp+Math.sin(x*.0102+sp*1.3)*amp*.36]);
+      ctx.beginPath();
+      for(let i=0;i<pts.length;i++)i?ctx.lineTo(pts[i][0],pts[i][1]):ctx.moveTo(pts[i][0],pts[i][1]);
+      for(let i=pts.length-1;i>=0;i--)ctx.lineTo(pts[i][0],pts[i][1]+th);
+      ctx.closePath();
+      const g=ctx.createLinearGradient(0,yB-amp,0,yB+th+amp);
+      g.addColorStop(0,`rgba(${col},0)`);g.addColorStop(.5,`rgba(${col},${(.075-k*.017).toFixed(4)})`);g.addColorStop(1,`rgba(${col},0)`);
+      ctx.fillStyle=g;ctx.fill();
+    }
   }
   function drawWaves(){
     const col=rgb();
@@ -458,12 +469,12 @@ const Bg=(function(){
     if(style==='neural')drawNeural();
     else if(style==='starfield')drawStarfield();
     else if(style==='bubbles')drawBubbles();
-    else if(style==='grid')drawGrid();
+    else if(style==='aurora')drawAurora();
     else if(style==='waves')drawWaves();
   }
   function start(){if(run)return;size();run=true;lastFrame=0;cv.style.display='';rafId=requestAnimationFrame(draw);}
   function stop(){run=false;if(rafId)cancelAnimationFrame(rafId);ctx&&ctx.clearRect(0,0,W||0,H||0);cv.style.display='none';}
-  function setStyle(name){style=name;seed();}
+  function setStyle(name){style=(name==='grid')?'aurora':name;seed();}
   addEventListener('resize',()=>{if(run)size();});
   document.addEventListener('visibilitychange',()=>{if(run&&!document.hidden)lastFrame=0;});
   return {start,stop,setStyle};
@@ -639,7 +650,8 @@ document.addEventListener('DOMContentLoaded',()=>{
   applyModuleVisibility();
 
   // restore animated background + style
-  let bgStyle='neural'; try{bgStyle=localStorage.getItem('mcgBgStyle')||'neural'}catch(e){}
+  let bgStyle='starfield'; try{bgStyle=localStorage.getItem('mcgBgStyle')||'starfield'}catch(e){}
+  if(bgStyle==='grid')bgStyle='aurora';   // renamed style
   const styleSel=document.getElementById('bg-style-select'); if(styleSel) styleSel.value=bgStyle;
   Bg.setStyle(bgStyle);
   let bg=true; try{bg=localStorage.getItem('mcgBg')!=='false'}catch(e){}
